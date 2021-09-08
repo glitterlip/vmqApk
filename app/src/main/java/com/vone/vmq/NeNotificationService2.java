@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -11,9 +12,12 @@ import android.os.PowerManager;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import android.support.v4.app.NotificationCompat;
+import android.system.Os;
 import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
+
+import com.vone.vmq.util.Constant;
 
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -34,6 +38,7 @@ public class NeNotificationService2  extends NotificationListenerService {
     private String TAG = "NeNotificationService2";
     private String host = "";
     private String key = "";
+    private String id = "";
     private Thread newThread = null;
     private PowerManager.WakeLock mWakeLock = null;
 
@@ -72,17 +77,17 @@ public class NeNotificationService2  extends NotificationListenerService {
                 Log.d(TAG, "心跳线程启动！");
                 while (true){
 
-                    SharedPreferences read = getSharedPreferences("vone", MODE_PRIVATE);
+                    SharedPreferences read = getSharedPreferences(Constant.SP_KEY, MODE_PRIVATE);
                     host = read.getString("host", "");
                     key = read.getString("key", "");
+                    id = read.getString("id", "");
 
                     //这里写入子线程需要做的工作
-                    String t = String.valueOf(new Date().getTime());
-                    String sign = md5(t+key);
-
 
                     OkHttpClient okHttpClient = new OkHttpClient();
-                    Request request = new Request.Builder().url("http://"+host+"/appHeart?t="+t+"&sign="+sign).method("GET",null).build();
+                    String url = String.format("https://%s/api/appHeart?id=%s&key=%s",host,id,key);
+
+                    Request request = new Request.Builder().url(url).addHeader("model", Build.BRAND + " " + Build.MODEL).method("GET",null).build();
                     Call call = okHttpClient.newCall(request);
                     call.enqueue(new Callback() {
                         @Override
@@ -121,8 +126,9 @@ public class NeNotificationService2  extends NotificationListenerService {
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
         Log.d(TAG, "接受到通知消息");
-        SharedPreferences read = getSharedPreferences("vone", MODE_PRIVATE);
+        SharedPreferences read = getSharedPreferences(Constant.SP_KEY, MODE_PRIVATE);
         host = read.getString("host", "");
+        id = read.getString("id", "");
         key = read.getString("key", "");
 
 
@@ -223,17 +229,12 @@ public class NeNotificationService2  extends NotificationListenerService {
 
 
     public void appPush(int type,double price){
-        SharedPreferences read = getSharedPreferences("vone", MODE_PRIVATE);
+        SharedPreferences read = getSharedPreferences(Constant.SP_KEY, MODE_PRIVATE);
         host = read.getString("host", "");
         key = read.getString("key", "");
+        id = read.getString("id", "");
 
-        Log.d(TAG, "onResponse  push: 开始:"+type+"  "+price);
-
-        String t = String.valueOf(new Date().getTime());
-        String sign = md5(type+""+ price + t + key);
-        String url = "http://"+host+"/appPush?t="+t+"&type="+type+"&price="+price+"&sign="+sign;
-        Log.d(TAG, "onResponse  push: 开始:"+url);
-
+        String url = String.format("https://%s/api/appPush?id=%s&key=%s&type=%s&price=%s",host,id,key,type,price);
         OkHttpClient okHttpClient = new OkHttpClient();
         Request request = new Request.Builder().url(url).method("GET",null).build();
         Call call = okHttpClient.newCall(request);
@@ -266,27 +267,6 @@ public class NeNotificationService2  extends NotificationListenerService {
         }
 
     }
-    public static String md5(String string) {
-        if (TextUtils.isEmpty(string)) {
-            return "";
-        }
-        MessageDigest md5 = null;
-        try {
-            md5 = MessageDigest.getInstance("MD5");
-            byte[] bytes = md5.digest(string.getBytes());
-            String result = "";
-            for (byte b : bytes) {
-                String temp = Integer.toHexString(b & 0xff);
-                if (temp.length() == 1) {
-                    temp = "0" + temp;
-                }
-                result += temp;
-            }
-            return result;
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        return "";
-    }
+
 
 }
